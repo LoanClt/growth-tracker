@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { FormData } from "@/utils/dataManager";
@@ -45,7 +44,7 @@ export const ChartContainer = ({ data }: ChartContainerProps) => {
                   axisLine={{ stroke: '#e5e7eb' }}
                 />
                 <Tooltip 
-                  formatter={(value) => [`$${value?.toLocaleString()}`, 'Revenue']}
+                  formatter={(value) => [`${value?.toLocaleString()} k$`, 'Revenue']}
                   labelFormatter={(label, payload) => {
                     const entry = payload?.[0]?.payload;
                     return entry ? `Date: ${entry.fullDate}` : label;

@@ -39,11 +39,8 @@ const Index = () => {
           <div className="text-center space-y-8">
             <div className="space-y-4">
               <h1 className="text-6xl font-thin text-gray-900 tracking-tight">
-                Business Evolution
+                Silicon Roundabout Ventures
               </h1>
-              <h2 className="text-6xl font-thin text-gray-900 tracking-tight">
-                Tracker
-              </h2>
             </div>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto font-light leading-relaxed">
               Track your business metrics over time with comprehensive analytics and insights. 

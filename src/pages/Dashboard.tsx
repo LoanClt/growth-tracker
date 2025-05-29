@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -10,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { saveFormData, getUserData, isFormOpenForUser, FormData } from "@/utils/dataManager";
 import { ChartContainer } from "@/components/ChartContainer";
-import { LogOut, TrendingUp, Lock } from "lucide-react";
+import { LogOut, TrendingUp, Lock, AlertCircle } from "lucide-react";
 
 const Dashboard = () => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -18,6 +17,7 @@ const Dashboard = () => {
   const { toast } = useToast();
   
   const [revenue, setRevenue] = useState("");
+  const [revenueError, setRevenueError] = useState("");
   const [trl, setTrl] = useState("");
   const [ip, setIp] = useState("");
   const [userData, setUserData] = useState<FormData[]>([]);
@@ -44,6 +44,16 @@ const Dashboard = () => {
     if (user) {
       const isOpen = isFormOpenForUser(user.username);
       setFormOpen(isOpen);
+    }
+  };
+
+  const handleRevenueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setRevenue(value);
+    if (value === "" || isNaN(Number(value))) {
+      setRevenueError("Please enter a valid number for revenue.");
+    } else {
+      setRevenueError("");
     }
   };
 
@@ -129,31 +139,38 @@ const Dashboard = () => {
               {formOpen ? (
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-2">
-                    <Label htmlFor="revenue" className="text-base font-medium">Revenue ($)</Label>
+                    <Label htmlFor="revenue" className="text-base font-medium">Revenue (k$)</Label>
                     <Input
                       id="revenue"
                       type="number"
                       value={revenue}
-                      onChange={(e) => setRevenue(e.target.value)}
-                      placeholder="Enter revenue"
+                      onChange={handleRevenueChange}
+                      placeholder="Enter revenue in thousands (k$)"
                       className="h-12 text-base rounded-xl border-gray-200"
                       required
                     />
+                    {revenueError && (
+                      <div className="flex items-center text-red-600 mt-1 text-sm font-light">
+                        <AlertCircle className="h-4 w-4 mr-1" />
+                        {revenueError}
+                      </div>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
                     <Label htmlFor="trl" className="text-base font-medium">Technology Readiness Level (TRL)</Label>
-                    <Input
+                    <select
                       id="trl"
-                      type="number"
-                      min="1"
-                      max="9"
                       value={trl}
                       onChange={(e) => setTrl(e.target.value)}
-                      placeholder="Enter TRL (1-9)"
-                      className="h-12 text-base rounded-xl border-gray-200"
+                      className="h-12 text-base rounded-xl border-gray-200 w-full px-4 py-2 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                       required
-                    />
+                    >
+                      <option value="" disabled>Select TRL (1-9)</option>
+                      {[...Array(9)].map((_, i) => (
+                        <option key={i+1} value={i+1}>{i+1}</option>
+                      ))}
+                    </select>
                   </div>
                   
                   <div className="space-y-2">
@@ -203,7 +220,7 @@ const Dashboard = () => {
                     <div className="flex justify-between items-center p-4 bg-gray-50/50 rounded-xl">
                       <span className="font-medium text-lg">Latest Revenue</span>
                       <span className="text-lg font-semibold text-green-600">
-                        ${userData[userData.length - 1]?.revenue?.toLocaleString() || 0}
+                        {userData[userData.length - 1]?.revenue?.toLocaleString() || 0} k$
                       </span>
                     </div>
                     
