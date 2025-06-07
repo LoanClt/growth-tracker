@@ -1,3 +1,4 @@
+import { supabase } from "@/lib/supabaseClient";
 
 export interface FormData {
   revenue: number;
@@ -13,162 +14,102 @@ export interface Account {
   formOpen: boolean;
 }
 
-export const saveFormData = (data: Omit<FormData, 'date' | 'username'>, username: string): void => {
-  const formEntry: FormData = {
+export const saveFormData = async (
+  data: Omit<FormData, 'date' | 'username'>,
+  username: string
+): Promise<void> => {
+  const formEntry = {
     ...data,
     date: new Date().toISOString(),
-    username
+    username,
   };
-  
-  const existingData = JSON.parse(localStorage.getItem('formData') || '[]');
-  existingData.push(formEntry);
-  localStorage.setItem('formData', JSON.stringify(existingData));
-  
-  // Auto-close form after submission
+  const { error } = await supabase.from("form_data").insert([formEntry]);
+  if (error) throw new Error(error.message);
   closeFormForUser(username);
 };
 
-export const getUserData = (username: string): FormData[] => {
-  const allData = JSON.parse(localStorage.getItem('formData') || '[]');
-  return allData.filter((entry: FormData) => entry.username === username);
+export const getUserData = async (username: string): Promise<FormData[]> => {
+  const { data, error } = await supabase
+    .from("form_data")
+    .select("*")
+    .eq("username", username)
+    .order("date", { ascending: true });
+  if (error) throw new Error(error.message);
+  return data || [];
 };
 
-export const getAllData = (): FormData[] => {
-  return JSON.parse(localStorage.getItem('formData') || '[]');
+export const getAllData = async (): Promise<FormData[]> => {
+  const { data, error } = await supabase
+    .from("form_data")
+    .select("*")
+    .order("date", { ascending: true });
+  if (error) throw new Error(error.message);
+  return data || [];
 };
 
-export const createAccount = (username: string, password: string): boolean => {
-  const existingAccounts = JSON.parse(localStorage.getItem('accounts') || '[]');
-  
+export const createAccount = async (username: string, password: string): Promise<boolean> => {
   // Check if account already exists
-  if (existingAccounts.some((acc: Account) => acc.username === username)) {
-    return false;
-  }
-  
-  const newAccount: Account = { username, password, formOpen: true };
-  existingAccounts.push(newAccount);
-  localStorage.setItem('accounts', JSON.stringify(existingAccounts));
+  const { data: existing, error: selectError } = await supabase
+    .from('users')
+    .select('username')
+    .eq('username', username);
+  if (selectError) throw new Error(selectError.message);
+  if (existing && existing.length > 0) return false;
+  const { data, error } = await supabase.from('users').insert([{ username, password, form_open: true }]);
+  console.log('Supabase insert result:', data, error); // Debug log
+  if (error) throw new Error(error.message);
   return true;
 };
 
-export const getAllAccounts = (): Account[] => {
-  const accounts = JSON.parse(localStorage.getItem('accounts') || '[]');
-  const defaultAccounts: Account[] = [
-    { username: 'admin', password: 'admin', formOpen: true },
-    { username: 'test', password: 'test', formOpen: true }
-  ];
-  
-  // Merge default accounts with custom ones, avoiding duplicates
-  const existingUsernames = accounts.map((acc: Account) => acc.username);
-  const filteredDefaults = defaultAccounts.filter(acc => !existingUsernames.includes(acc.username));
-  
-  return [...filteredDefaults, ...accounts];
+export const getAllAccounts = async (): Promise<Account[]> => {
+  const { data, error } = await supabase.from('users').select('*');
+  if (error) throw new Error(error.message);
+  return data || [];
 };
 
-export const getAllUsernames = (): string[] => {
-  const accounts = getAllAccounts();
-  return accounts.map(acc => acc.username);
+export const getAllUsernames = async (): Promise<string[]> => {
+  const { data, error } = await supabase.from('users').select('username');
+  if (error) throw new Error(error.message);
+  return (data || []).map((acc: { username: string }) => acc.username);
 };
 
-export const deleteAccount = (username: string): boolean => {
-  if (username === 'admin' || username === 'test') {
-    return false; // Cannot delete default accounts
-  }
-  
-  const accounts = JSON.parse(localStorage.getItem('accounts') || '[]');
-  const filteredAccounts = accounts.filter((acc: Account) => acc.username !== username);
-  localStorage.setItem('accounts', JSON.stringify(filteredAccounts));
-  
-  // Also remove all data for this user
-  const allData = getAllData();
-  const filteredData = allData.filter(entry => entry.username !== username);
-  localStorage.setItem('formData', JSON.stringify(filteredData));
-  
+export const deleteAccount = async (username: string): Promise<boolean> => {
+  const { error } = await supabase.from('users').delete().eq('username', username);
+  if (error) throw new Error(error.message);
   return true;
 };
 
-export const updateAccountCredentials = (oldUsername: string, newUsername: string, newPassword: string): boolean => {
-  const accounts = JSON.parse(localStorage.getItem('accounts') || '[]');
-  const defaultAccounts = ['admin', 'test'];
-  
-  // Find account to update
-  if (defaultAccounts.includes(oldUsername)) {
-    // Update default accounts differently
-    const allAccounts = getAllAccounts();
-    const accountIndex = allAccounts.findIndex(acc => acc.username === oldUsername);
-    if (accountIndex === -1) return false;
-    
-    // For default accounts, we need to add them to localStorage to override
-    const existingCustomAccounts = JSON.parse(localStorage.getItem('accounts') || '[]');
-    const updatedAccount = { ...allAccounts[accountIndex], username: newUsername, password: newPassword };
-    
-    if (oldUsername !== newUsername) {
-      // If username changed, add new account and mark old as deleted
-      existingCustomAccounts.push(updatedAccount);
-      existingCustomAccounts.push({ username: oldUsername, password: '', formOpen: false, deleted: true });
-    } else {
-      // Just update password
-      existingCustomAccounts.push(updatedAccount);
-    }
-    
-    localStorage.setItem('accounts', JSON.stringify(existingCustomAccounts));
-  } else {
-    // Update custom account
-    const accountIndex = accounts.findIndex((acc: Account) => acc.username === oldUsername);
-    if (accountIndex === -1) return false;
-    
-    accounts[accountIndex].username = newUsername;
-    accounts[accountIndex].password = newPassword;
-    localStorage.setItem('accounts', JSON.stringify(accounts));
-  }
-  
-  // Update username in all form data if username changed
-  if (oldUsername !== newUsername) {
-    const allData = getAllData();
-    const updatedData = allData.map(entry => 
-      entry.username === oldUsername 
-        ? { ...entry, username: newUsername }
-        : entry
-    );
-    localStorage.setItem('formData', JSON.stringify(updatedData));
-  }
-  
+export const updateAccountCredentials = async (
+  oldUsername: string,
+  newUsername: string,
+  newPassword: string
+): Promise<boolean> => {
+  const { error } = await supabase
+    .from('users')
+    .update({ username: newUsername, password: newPassword })
+    .eq('username', oldUsername);
+  if (error) throw new Error(error.message);
   return true;
 };
 
-export const isFormOpenForUser = (username: string): boolean => {
-  const accounts = getAllAccounts();
-  const account = accounts.find(acc => acc.username === username);
-  return account?.formOpen ?? false;
+export const isFormOpenForUser = async (username: string): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('form_open')
+    .eq('username', username)
+    .single();
+  if (error) throw new Error(error.message);
+  return data?.form_open ?? false;
 };
 
-export const toggleFormForUser = (username: string, isOpen: boolean): void => {
-  const accounts = JSON.parse(localStorage.getItem('accounts') || '[]');
-  const defaultAccounts = ['admin', 'test'];
-  
-  if (defaultAccounts.includes(username)) {
-    // For default accounts, add override to localStorage
-    const existingAccount = accounts.find((acc: Account) => acc.username === username);
-    if (existingAccount) {
-      existingAccount.formOpen = isOpen;
-    } else {
-      const allAccounts = getAllAccounts();
-      const defaultAccount = allAccounts.find(acc => acc.username === username);
-      if (defaultAccount) {
-        accounts.push({ ...defaultAccount, formOpen: isOpen });
-      }
-    }
-  } else {
-    // Update custom account
-    const accountIndex = accounts.findIndex((acc: Account) => acc.username === username);
-    if (accountIndex !== -1) {
-      accounts[accountIndex].formOpen = isOpen;
-    }
-  }
-  
-  localStorage.setItem('accounts', JSON.stringify(accounts));
+export const toggleFormForUser = async (username: string, isOpen: boolean): Promise<void> => {
+  const { error } = await supabase
+    .from('users')
+    .update({ form_open: isOpen })
+    .eq('username', username);
+  if (error) throw new Error(error.message);
 };
 
-export const closeFormForUser = (username: string): void => {
-  toggleFormForUser(username, false);
+export const closeFormForUser = async (username: string): Promise<void> => {
+  await toggleFormForUser(username, false);
 };

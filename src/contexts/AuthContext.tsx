@@ -1,5 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 
 interface User {
   username: string;
@@ -8,60 +8,39 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => boolean;
-  adminLogin: (password: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
+  adminLogin: (password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+    // Optionally, implement persistent login with Supabase auth/session in the future
   }, []);
 
-  const login = (username: string, password: string): boolean => {
-    const accounts = JSON.parse(localStorage.getItem('accounts') || '[]');
-    
-    // Default accounts
-    const defaultAccounts = [
-      { username: 'admin', password: 'admin' },
-      { username: 'test', password: 'test' }
-    ];
-    
-    // Check if account exists in stored accounts or default accounts
-    const allAccounts = [...defaultAccounts, ...accounts];
-    const account = allAccounts.find(acc => acc.username === username && acc.password === password);
-    
-    if (account) {
-      const userData = { username };
-      setUser(userData);
-      localStorage.setItem('currentUser', JSON.stringify(userData));
-      return true;
-    }
-    return false;
+  const login = async (username: string, password: string): Promise<boolean> => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .eq('password', password)
+      .single();
+    if (error || !data) return false;
+    setUser({ username: data.username, isAdmin: !!data.is_admin });
+    return true;
   };
 
-  const adminLogin = (password: string): boolean => {
+  const adminLogin = async (password: string): Promise<boolean> => {
     if (password === 'SRV-admin') {
-      const adminData = { username: 'admin', isAdmin: true };
-      setUser(adminData);
-      localStorage.setItem('currentUser', JSON.stringify(adminData));
+      setUser({ username: 'admin', isAdmin: true });
       return true;
     }
     return false;
@@ -69,7 +48,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('currentUser');
   };
 
   return (

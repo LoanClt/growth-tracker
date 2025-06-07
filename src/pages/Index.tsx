@@ -2,11 +2,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
-import { User, Shield, BarChart3, ArrowRight } from "lucide-react";
+import { User, Shield, BarChart3, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 const Index = () => {
   const { isAuthenticated, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const { login } = useAuth();
+  const { toast } = useToast();
+  const [showPassword, setShowPassword] = useState(false);
 
   if (isAuthenticated) {
     if (isAdmin) {
@@ -17,6 +26,32 @@ const Index = () => {
       return null;
     }
   }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const success = await login(username, password);
+      if (success) {
+        toast({
+          title: "Login successful",
+          description: "Welcome to your dashboard!",
+        });
+        navigate('/dashboard');
+      } else {
+        toast({
+          title: "Login failed",
+          description: "Invalid username or password",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Login error",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
@@ -43,39 +78,48 @@ const Index = () => {
               </h1>
             </div>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto font-light leading-relaxed">
-              Track your business metrics over time with comprehensive analytics and insights. 
-              Monitor revenue, TRL progression, and IP development seamlessly.
+              A simple form to track and visualize your key business data over time.
             </p>
           </div>
 
-          {/* Main Action Cards */}
-          <div className="flex justify-center">
-            <div className="flex justify-center w-full">
-              {/* User Login Card */}
-              <Card className="border-0 shadow-sm bg-white/70 backdrop-blur-sm hover:shadow-lg transition-all duration-300 group max-w-md w-full mx-auto">
-                <CardHeader className="text-center pb-4">
-                  <div className="mx-auto mb-4 p-4 bg-blue-50 rounded-2xl w-fit group-hover:bg-blue-100 transition-colors">
-                    <User className="h-8 w-8 text-blue-600" />
-                  </div>
-                  <CardTitle className="text-2xl font-medium text-gray-900">
-                    User Access
-                  </CardTitle>
-                  <CardDescription className="text-gray-600 font-light">
-                    Access your personal dashboard and track your business metrics
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <Button 
-                    onClick={() => navigate('/login')} 
-                    className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-200 group-hover:scale-[1.02]"
-                  >
-                    Get Started
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </Card>
+          {/* Login Form */}
+          <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-6 bg-white/80 backdrop-blur-sm p-8 rounded-xl shadow-lg">
+            <div className="space-y-2">
+              <Label htmlFor="username" className="text-base font-medium">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your username"
+                required
+              />
             </div>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-base font-medium">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                  onClick={() => setShowPassword((v) => !v)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+            <Button type="submit" className="w-full h-12 text-base font-medium rounded-xl bg-blue-600 hover:bg-blue-700">
+              Login
+            </Button>
+          </form>
 
           {/* Secondary Info */}
           <div className="text-center pt-8">

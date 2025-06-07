@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -18,24 +17,43 @@ const AdminDashboard = () => {
   const { user, logout, isAuthenticated, isAdmin } = useAuth();
   const navigate = useNavigate();
   
-  const [selectedUser, setSelectedUser] = useState("all-users");
+  const [selectedUser, setSelectedUser] = useState<string>("");
   const [allData, setAllData] = useState<FormData[]>([]);
   const [usernames, setUsernames] = useState<string[]>([]);
+
+  // Compute last answered date for each user
+  const lastAnsweredMap = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    usernames.forEach(username => {
+      const userEntries = allData.filter(entry => entry.username === username);
+      if (userEntries.length > 0) {
+        // Get the latest date
+        const latest = userEntries.reduce((a, b) => (a.date > b.date ? a : b));
+        map[username] = latest.date;
+      } else {
+        map[username] = null;
+      }
+    });
+    return map;
+  }, [usernames, allData]);
 
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) {
       navigate('/admin-login');
       return;
     }
-    
     loadData();
   }, [isAuthenticated, isAdmin, navigate]);
 
-  const loadData = () => {
-    const data = getAllData();
-    const users = getAllUsernames();
-    setAllData(data);
-    setUsernames(users);
+  const loadData = async () => {
+    try {
+      const data = await getAllData();
+      const users = await getAllUsernames();
+      setAllData(data);
+      setUsernames(users);
+    } catch (err: any) {
+      console.error(err);
+    }
   };
 
   const handleLogout = () => {
@@ -44,23 +62,11 @@ const AdminDashboard = () => {
   };
 
   const getFilteredData = () => {
-    if (!selectedUser || selectedUser === "all-users") return allData;
+    if (!selectedUser) return [];
     return allData.filter(entry => entry.username === selectedUser);
   };
 
-  const getUserStats = () => {
-    const userDataCounts = usernames.reduce((acc, username) => {
-      acc[username] = allData.filter(entry => entry.username === username).length;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    return userDataCounts;
-  };
-
   if (!user || !isAdmin) return null;
-
-  const filteredData = getFilteredData();
-  const userStats = getUserStats();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
@@ -108,7 +114,6 @@ const AdminDashboard = () => {
                       <SelectValue placeholder="Choose a user" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all-users">All Users</SelectItem>
                       {usernames.map(username => (
                         <SelectItem key={username} value={username}>
                           {username}
@@ -117,29 +122,30 @@ const AdminDashboard = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                
-                <div className="text-center p-6 bg-blue-50/30 rounded-xl border border-blue-100/50">
-                  <p className="text-sm text-gray-600 mb-1 font-light">Showing data for</p>
-                  <p className="text-xl font-medium text-blue-600 mb-2">
-                    {selectedUser === "all-users" ? "All Users" : selectedUser}
-                  </p>
-                  <p className="text-base text-gray-600 font-light">
-                    {filteredData.length} entries
-                  </p>
-                </div>
-
+                {selectedUser && (
+                  <div className="text-center p-6 bg-blue-50/30 rounded-xl border border-blue-100/50">
+                    <p className="text-sm text-gray-600 mb-1 font-light">Last answered:</p>
+                    <p className="text-xl font-medium text-blue-600 mb-2">
+                      {lastAnsweredMap[selectedUser] ? new Date(lastAnsweredMap[selectedUser]!).toLocaleString() : 'No submissions yet'}
+                    </p>
+                    <p className="text-base text-gray-600 font-light">
+                      {getFilteredData().length} entries
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-3">
                   <h4 className="text-lg font-medium">User Statistics</h4>
                   <div className="space-y-3 max-h-40 overflow-y-auto">
-                    {Object.entries(userStats).map(([username, count]) => (
+                    {usernames.map(username => (
                       <div key={username} className="flex justify-between items-center p-4 bg-gray-50/30 rounded-xl border border-gray-100/50">
                         <span className="font-medium text-base">{username}</span>
+                        <span className="text-sm text-gray-500">{lastAnsweredMap[username] ? new Date(lastAnsweredMap[username]!).toLocaleDateString() : 'No submissions'}</span>
                         <Badge variant="secondary" className="text-sm font-light">
-                          {count} entries
+                          {allData.filter(entry => entry.username === username).length} entries
                         </Badge>
                       </div>
                     ))}
-                    {Object.keys(userStats).length === 0 && (
+                    {usernames.length === 0 && (
                       <p className="text-gray-500 text-center py-4 text-base font-light">No users found</p>
                     )}
                   </div>
@@ -153,20 +159,20 @@ const AdminDashboard = () => {
         <AccountManagement onAccountsChange={loadData} />
 
         {/* Analytics Section */}
-        {filteredData.length > 0 && (
+        {selectedUser && getFilteredData().length > 0 && (
           <div className="space-y-8">
             <h2 className="text-4xl font-thin text-gray-900 tracking-tight">
-              Analytics for {selectedUser === "all-users" ? "All Users" : selectedUser}
+              Analytics for {selectedUser}
             </h2>
-            <ChartContainer data={filteredData} />
+            <ChartContainer data={getFilteredData()} />
           </div>
         )}
 
-        {filteredData.length === 0 && (
+        {selectedUser && getFilteredData().length === 0 && (
           <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
             <CardContent className="text-center py-16">
               <p className="text-lg text-gray-500 font-light">
-                No data available for the selected user(s). Users need to submit the form to generate analytics.
+                No data available for the selected user. User needs to submit the form to generate analytics.
               </p>
             </CardContent>
           </Card>

@@ -33,17 +33,33 @@ const Dashboard = () => {
     checkFormStatus();
   }, [isAuthenticated, user, navigate]);
 
-  const loadData = () => {
+  const loadData = async () => {
     if (user) {
-      const data = getUserData(user.username);
-      setUserData(data);
+      try {
+        const data = await getUserData(user.username);
+        setUserData(data);
+      } catch (err: any) {
+        toast({
+          title: "Error loading data",
+          description: err.message,
+          variant: "destructive",
+        });
+      }
     }
   };
 
-  const checkFormStatus = () => {
+  const checkFormStatus = async () => {
     if (user) {
-      const isOpen = isFormOpenForUser(user.username);
-      setFormOpen(isOpen);
+      try {
+        const isOpen = await isFormOpenForUser(user.username);
+        setFormOpen(isOpen);
+      } catch (err: any) {
+        toast({
+          title: "Error checking form status",
+          description: err.message,
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -57,9 +73,8 @@ const Dashboard = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!formOpen) {
       toast({
         title: "Form is closed",
@@ -68,25 +83,29 @@ const Dashboard = () => {
       });
       return;
     }
-    
     if (!user) return;
-    
-    saveFormData({
-      revenue: Number(revenue),
-      trl: Number(trl),
-      ip
-    }, user.username);
-    
-    toast({
-      title: "Data saved successfully!",
-      description: "Your form data has been recorded. The form is now closed.",
-    });
-    
-    setRevenue("");
-    setTrl("");
-    setIp("");
-    loadData();
-    checkFormStatus();
+    try {
+      await saveFormData({
+        revenue: Number(revenue),
+        trl: Number(trl),
+        ip
+      }, user.username);
+      toast({
+        title: "Data saved successfully!",
+        description: "Your form data has been recorded. The form is now closed.",
+      });
+      setRevenue("");
+      setTrl("");
+      setIp("");
+      await loadData();
+      checkFormStatus();
+    } catch (err: any) {
+      toast({
+        title: "Error saving data",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleLogout = () => {

@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -8,10 +7,10 @@ import { Download } from "lucide-react";
 const ExportData = () => {
   const { toast } = useToast();
 
-  const handleExportData = () => {
+  const handleExportData = async () => {
     try {
-      const allData = getAllData();
-      const allAccounts = getAllAccounts();
+      const allData = await getAllData();
+      const allAccounts = await getAllAccounts();
       
       const exportData = {
         formData: allData,
@@ -38,10 +37,10 @@ const ExportData = () => {
         title: "Data exported successfully",
         description: "All data has been downloaded as a JSON file.",
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Export failed",
-        description: "There was an error exporting the data.",
+        description: error.message,
         variant: "destructive",
       });
     }

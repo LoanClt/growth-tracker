@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,7 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { getAllAccounts, deleteAccount, updateAccountCredentials, toggleFormForUser, Account } from "@/utils/dataManager";
-import { UserMinus, Edit, Users, ToggleLeft, ToggleRight } from "lucide-react";
+import { UserMinus, Edit, Users, ToggleLeft, ToggleRight, Eye, EyeOff } from "lucide-react";
 
 interface AccountManagementProps {
   onAccountsChange: () => void;
@@ -17,29 +16,44 @@ interface AccountManagementProps {
 
 const AccountManagement = ({ onAccountsChange }: AccountManagementProps) => {
   const { toast } = useToast();
-  const [accounts, setAccounts] = useState<Account[]>(getAllAccounts());
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [editUsername, setEditUsername] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
-  const refreshAccounts = () => {
-    const updatedAccounts = getAllAccounts();
-    setAccounts(updatedAccounts);
-    onAccountsChange();
+  const refreshAccounts = async () => {
+    try {
+      const updatedAccounts = await getAllAccounts();
+      setAccounts(updatedAccounts);
+      onAccountsChange();
+    } catch (err: any) {
+      toast({
+        title: "Error loading accounts",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteAccount = (username: string) => {
-    if (deleteAccount(username)) {
+  useEffect(() => {
+    refreshAccounts();
+    // eslint-disable-next-line
+  }, []);
+
+  const handleDeleteAccount = async (username: string) => {
+    try {
+      await deleteAccount(username);
       toast({
         title: "Account deleted",
         description: `Account ${username} has been deleted successfully!`,
       });
-      refreshAccounts();
-    } else {
+      await refreshAccounts();
+    } catch (err: any) {
       toast({
         title: "Cannot delete account",
-        description: "Default accounts cannot be deleted",
+        description: err.message,
         variant: "destructive",
       });
     }
@@ -52,33 +66,41 @@ const AccountManagement = ({ onAccountsChange }: AccountManagementProps) => {
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateAccount = () => {
+  const handleUpdateAccount = async () => {
     if (!editingAccount) return;
-    
-    if (updateAccountCredentials(editingAccount.username, editUsername, editPassword)) {
+    try {
+      await updateAccountCredentials(editingAccount.username, editUsername, editPassword);
       toast({
         title: "Account updated",
         description: `Account credentials have been updated successfully!`,
       });
       setIsEditDialogOpen(false);
       setEditingAccount(null);
-      refreshAccounts();
-    } else {
+      await refreshAccounts();
+    } catch (err: any) {
       toast({
         title: "Failed to update account",
-        description: "Unable to update account credentials",
+        description: err.message,
         variant: "destructive",
       });
     }
   };
 
-  const handleToggleForm = (username: string, isOpen: boolean) => {
-    toggleFormForUser(username, isOpen);
-    toast({
-      title: "Form access updated",
-      description: `Form has been ${isOpen ? 'opened' : 'closed'} for ${username}`,
-    });
-    refreshAccounts();
+  const handleToggleForm = async (username: string, isOpen: boolean) => {
+    try {
+      await toggleFormForUser(username, isOpen);
+      toast({
+        title: "Form access updated",
+        description: `Form has been ${isOpen ? 'opened' : 'closed'} for ${username}`,
+      });
+      await refreshAccounts();
+    } catch (err: any) {
+      toast({
+        title: "Error updating form access",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -151,13 +173,23 @@ const AccountManagement = ({ onAccountsChange }: AccountManagementProps) => {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="edit-password">Password</Label>
-                          <Input
-                            id="edit-password"
-                            type="password"
-                            value={editPassword}
-                            onChange={(e) => setEditPassword(e.target.value)}
-                            placeholder="Enter new password"
-                          />
+                          <div className="relative">
+                            <Input
+                              id="edit-password"
+                              type={showEditPassword ? "text" : "password"}
+                              value={editPassword}
+                              onChange={(e) => setEditPassword(e.target.value)}
+                              placeholder="Enter new password"
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                              onClick={() => setShowEditPassword((v) => !v)}
+                              tabIndex={-1}
+                            >
+                              {showEditPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            </button>
+                          </div>
                         </div>
                       </div>
                       <DialogFooter>

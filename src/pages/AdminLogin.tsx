@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -7,27 +6,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Shield } from "lucide-react";
+import { ArrowLeft, Shield, Eye, EyeOff } from "lucide-react";
 
 const AdminLogin = () => {
   const [password, setPassword] = useState("");
   const { adminLogin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (adminLogin(password)) {
+    try {
+      const success = await adminLogin(password);
+      if (success) {
+        toast({
+          title: "Admin access granted",
+          description: "Welcome to the admin dashboard!",
+        });
+        navigate('/admin-dashboard');
+      } else {
+        toast({
+          title: "Access denied",
+          description: "Invalid admin password",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
       toast({
-        title: "Admin access granted",
-        description: "Welcome to the admin dashboard!",
-      });
-      navigate('/admin-dashboard');
-    } else {
-      toast({
-        title: "Access denied",
-        description: "Invalid admin password",
+        title: "Admin login error",
+        description: err.message,
         variant: "destructive",
       });
     }
@@ -49,31 +57,34 @@ const AdminLogin = () => {
           <CardHeader className="text-center">
             <Shield className="h-12 w-12 text-red-600 mx-auto mb-2" />
             <CardTitle>Admin Access</CardTitle>
-            <CardDescription>
-              Enter admin password to continue
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="password">Admin Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter admin password"
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter admin password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                    onClick={() => setShowPassword((v) => !v)}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
               <Button type="submit" className="w-full">
                 Access Admin Dashboard
               </Button>
             </form>
-
-            <div className="mt-6 p-4 bg-red-50 rounded-lg">
-              <p className="text-sm text-red-600">Password: SRV-admin</p>
-            </div>
           </CardContent>
         </Card>
       </div>
